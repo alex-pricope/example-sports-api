@@ -1,0 +1,87 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  # Run this manually as well
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Setup .NET environment (use 8)
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.x'
+
+      # Step 3: Restore NuGet packages for the API
+      - name: Restore NuGet Packages for Client
+        run: dotnet restore MyCompany.Api/MyCompany.Api.csproj
+
+      # Step 4: Build the API
+      - name: Build API Project
+        run: dotnet build MyCompany.Api/MyCompany.Api.csproj --configuration Release --no-restore
+
+      # Step 5: Restore NuGet packages for the unit tests
+      - name: Restore NuGet Packages for Unit Test Project
+        run: dotnet restore MyCompany.Services.Tests/MyCompany.Services.Tests.csproj
+
+      # Step 6: Build the unit tests project
+      - name: Build Test Project
+        run: dotnet build MyCompany.Services.Tests/MyCompany.Services.Tests.csproj --configuration Release --no-restore
+
+      # Step 7: Restore NuGet packages for the unit tests
+      - name: Restore NuGet Packages for Unit Test Project
+        run: dotnet restore MyCompany.Integration.Tests/MyCompany.Integration.Tests.csproj
+
+      # Step 8: Build the integration tests project
+      - name: Build Test Project
+        run: dotnet build MyCompany.Integration.Tests/MyCompany.Integration.Tests.csproj --configuration Release --no-restore
+
+      # Step 9 
+      - name: Start API
+        run: |
+          nohup dotnet run --project MyCompany.Api/MyCompany.Api.csproj --urls "http://localhost:5054" > api.log 2>&1 &
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+
+      # Step 10: Wait for the API to be ready
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for API to start..."
+          for i in {1..30}; do
+            if curl --fail http://localhost:5054/api/health; then
+              echo "API is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not start in time." >&2
+          exit 1
+
+      # Step 11: Run Unit Tests
+      - name: Run Unit Tests
+        run: dotnet test MyCompany.Services.Tests/MyCompany.Services.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      # Step 12: Run Integration Tests
+      - name: Run Integration Tests
+        run: dotnet test MyCompany.Integration.Tests/MyCompany.Integration.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      # Step 13: Save API logs (on failure)
+      - name: Save API logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: api-log
+          path: api.log
