@@ -48,9 +48,8 @@ The API also has:
 * Versioning
 * Separation of endpoints (team and players)
 * Integration tests for all endpoints
-* Great documentation
+* Good documentation, swagger docs
 * Good DTO separation
-* A good swagger endpoint
 
 ## Data store
 I used `EF core` with `localdb SqlLite` - this is great for a rapid start without the need for a more complicated setup.\
